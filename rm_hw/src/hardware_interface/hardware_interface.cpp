@@ -81,7 +81,8 @@ bool RmRobotHW::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw_nh)
                                         CanDataPtr{ .type2act_coeffs_ = &type2act_coeffs_,
                                                     .id2act_data_ = &bus_id2act_data_[bus_name],
                                                     .id2imu_data_ = &bus_id2imu_data_[bus_name],
-                                                    .id2tof_data_ = &bus_id2tof_data_[bus_name] },
+                                                    .id2tof_data_ = &bus_id2tof_data_[bus_name],
+                                                    .id2gpio_data_ = &bus_id2gpio_data_[bus_name] },
                                         thread_priority_));
       else
         ROS_ERROR_STREAM("Unknown bus: " << bus_name);

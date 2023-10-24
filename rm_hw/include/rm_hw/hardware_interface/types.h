@@ -84,6 +84,12 @@ struct ImuData
   rm_common::ImuFilterBase* imu_filter;
 };
 
+struct GpioData
+{
+  ros::Time stamp;
+  int state[8], mode[8];
+};
+
 struct TofData
 {
   double strength;
@@ -96,5 +102,6 @@ struct CanDataPtr
   std::unordered_map<int, ActData>* id2act_data_;
   std::unordered_map<int, ImuData>* id2imu_data_;
   std::unordered_map<int, TofData>* id2tof_data_;
+  std::unordered_map<int, GpioData>* id2gpio_data_;
 };
 }  // namespace rm_hw

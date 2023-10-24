@@ -54,6 +54,8 @@ CanBus::CanBus(const std::string& bus_name, CanDataPtr data_ptr, int thread_prio
   rm_frame0_.can_dlc = 8;
   rm_frame1_.can_id = 0x1FF;
   rm_frame1_.can_dlc = 8;
+  rm_frame2_.can_id = 0x300;
+  rm_frame2_.can_dlc = 2;
 }
 
 void CanBus::write()
@@ -62,6 +64,7 @@ void CanBus::write()
   // safety first
   std::fill(std::begin(rm_frame0_.data), std::end(rm_frame0_.data), 0);
   std::fill(std::begin(rm_frame1_.data), std::end(rm_frame1_.data), 0);
+  std::fill(std::begin(rm_frame2_.data), std::end(rm_frame2_.data), 0);
 
   for (auto& item : *data_ptr_.id2act_data_)
   {
@@ -69,7 +72,7 @@ void CanBus::write()
     {
       if (item.second.halted)
       {
-        ROS_ERROR_STREAM(item.second.name << "LOSE CAN");
+        //        ROS_ERROR_STREAM(item.second.name << "LOSE CAN");
         continue;
       }
       const ActCoeff& act_coeff = data_ptr_.type2act_coeffs_->find(item.second.type)->second;
@@ -111,6 +114,12 @@ void CanBus::write()
       frame.data[7] = tau & 0xff;
       socket_can_.write(&frame);
     }
+    //    else if (item.second.type.find("gpio") != std::string::npos)
+    //    {
+    //      can_frame frame{};
+    //      frame.can_id = 0x300;
+    //      frame.can_dlc = 2;
+    //    }
   }
 
   if (has_write_frame0)
@@ -256,6 +265,23 @@ void CanBus::read(ros::Time time)
       TofData& tof_data = data_ptr_.id2tof_data_->find(frame.can_id)->second;
       tof_data.distance = ((int16_t)((frame.data[1]) << 8) | frame.data[0]);
       tof_data.strength = ((int16_t)((frame.data[3]) << 8) | frame.data[2]);
+      continue;
+    }
+    //    else if(frame.can_id == static_cast<unsigned int>(0x301)) // Check if Gpio
+    else if (data_ptr_.id2gpio_data_->find(frame.can_id) != data_ptr_.id2gpio_data_->end())
+    {
+      GpioData& gpio_data = data_ptr_.id2gpio_data_->find(frame.can_id)->second;
+      for (int a = 0; a < 8; a++)
+      {
+        gpio_data.mode[a] = 1 & ((int16_t)(frame.data[0] >> a));
+        gpio_data.state[a] = 1 & ((int16_t)(frame.data[1] >> a));
+      }
+      ROS_INFO_STREAM("Gpio modes: " << gpio_data.mode[7] << gpio_data.mode[6] << gpio_data.mode[5] << gpio_data.mode[4]
+                                     << gpio_data.mode[3] << gpio_data.mode[2] << gpio_data.mode[1]
+                                     << gpio_data.mode[0]);
+      ROS_INFO_STREAM("Gpio states: " << gpio_data.state[7] << gpio_data.state[6] << gpio_data.state[5]
+                                      << gpio_data.state[4] << gpio_data.state[3] << gpio_data.state[2]
+                                      << gpio_data.state[1] << gpio_data.state[0]);
       continue;
     }
     if (frame.can_id != 0x0)

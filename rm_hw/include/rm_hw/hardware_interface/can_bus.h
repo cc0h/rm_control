@@ -90,6 +90,7 @@ private:
 
   can_frame rm_frame0_{};  // for id 0x201~0x204
   can_frame rm_frame1_{};  // for id 0x205~0x208
+  can_frame rm_frame2_{};  // for gpio
 
   mutable std::mutex mutex_;
 };

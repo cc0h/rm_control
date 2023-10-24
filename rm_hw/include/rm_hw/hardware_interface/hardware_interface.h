@@ -214,6 +214,9 @@ private:
   // TF radar
   std::unordered_map<std::string, std::unordered_map<int, TofData>> bus_id2tof_data_{};
 
+  // gpio
+  std::unordered_map<std::string, std::unordered_map<int, GpioData>> bus_id2gpio_data_{};
+
   ros::Time last_publish_time_;
   std::shared_ptr<realtime_tools::RealtimePublisher<rm_msgs::ActuatorState>> actuator_state_pub_;
 };
