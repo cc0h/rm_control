@@ -18,7 +18,7 @@ struct GpioData
 {
   std::string name;
   GpioType type;
-  int pin;
+  int bit;
   bool* value;
 };
 
@@ -26,8 +26,7 @@ class GpioStateHandle
 {
 public:
   GpioStateHandle() = default;
-  GpioStateHandle(std::string name, GpioType type, bool* value, int num)
-    : name_(std::move(name)), type_(type), value_(value)
+  GpioStateHandle(std::string name, GpioType type, bool* value) : name_(std::move(name)), type_(type), value_(value)
   {
     if (!value)
       throw hardware_interface::HardwareInterfaceException("Cannot create handle '" + name +

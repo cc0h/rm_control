@@ -405,32 +405,67 @@ bool RmRobotHW::parseGpioData(XmlRpc::XmlRpcValue& gpio_datas, ros::NodeHandle& 
   ROS_ASSERT(gpio_datas.getType() == XmlRpc::XmlRpcValue::TypeStruct);
   try
   {
-    for (auto it = gpio_datas.begin(); it != gpio_datas.end(); ++it)
+    if (!gpio_datas.hasMember("bus"))
     {
-      if (!it->second.hasMember("bus"))
-      {
-        ROS_ERROR_STREAM("Gpio2can has no associated bus.");
-        continue;
-      }
-      else if (!it->second.hasMember("id"))
-      {
-        ROS_ERROR_STREAM("Gpio2can has no associated ID.");
-        continue;
-      }
-      std::string bus = gpio_datas[it->first]["bus"];
-      int id = static_cast<int>(gpio_datas[it->first]["id"]);
-      // for bus interface
-      if (bus_id2gpio_data_.find(bus) == bus_id2gpio_data_.end())
-        bus_id2gpio_data_.insert(std::make_pair(bus, std::unordered_map<int, GpioData>()));
-
-      if (!(bus_id2gpio_data_[bus].find(id) == bus_id2gpio_data_[bus].end()))
-      {
-        ROS_ERROR_STREAM("Repeat Gpio2can on bus " << bus << " and ID " << id);
-        return false;
-      }
-      else
-        bus_id2gpio_data_[bus].insert((std::make_pair(id, GpioData{ .state = {}, .mode = {} })));
+      ROS_ERROR_STREAM("Gpio2can has no associated bus.");
+      return false;
     }
+    else if (!gpio_datas.hasMember("id"))
+    {
+      ROS_ERROR_STREAM("Gpio2can has no associated ID.");
+      return false;
+    }
+    std::string bus = gpio_datas["bus"];
+    int id = static_cast<int>(gpio_datas["id"]);
+    if (gpio_datas.size() < 3)
+    {
+      ROS_ERROR_STREAM("The gpio config is wrong,check it!");
+      return false;
+    }
+    auto it = gpio_datas.begin();
+    std::advance(it, 2);
+    for (; it != gpio_datas.end(); ++it)
+    {
+      if (it->second.hasMember("bit"))
+      {
+        rm_control::GpioData gpio_data;
+        gpio_data.name = it->first;
+        if (std::string(gpio_datas[it->first]["direction"]) == "in")
+        {
+          gpio_data.type = rm_control::INPUT;
+        }
+        else if (std::string(gpio_datas[it->first]["direction"]) == "out")
+        {
+          gpio_data.type = rm_control::OUTPUT;
+        }
+        else
+        {
+          ROS_ERROR("Type set error of %s!", it->first.data());
+          continue;
+        }
+
+        gpio_data.bit = gpio_datas[it->first]["bit"];
+        gpio_data.value = new bool(false);
+        gpio_manager_.gpio_state_values.push_back(gpio_data);
+        rm_control::GpioStateHandle gpio_state_handle(it->first, gpio_data.type,
+                                                      gpio_manager_.gpio_state_values.back().value);
+        gpio_state_interface_.registerHandle(gpio_state_handle);
+        if (gpio_data.type == rm_control::OUTPUT)
+        {
+          gpio_manager_.gpio_command_values.push_back(gpio_data);
+          rm_control::GpioCommandHandle gpio_command_handle(it->first, gpio_data.type,
+                                                            gpio_manager_.gpio_command_values.back().value);
+          gpio_command_interface_.registerHandle(gpio_command_handle);
+        }
+      }
+    }
+    if (!(bus_id2gpio_data_[bus].find(id) == bus_id2gpio_data_[bus].end()))
+    {
+      ROS_ERROR_STREAM("Repeat gpio2can id,please check.");
+      return false;
+    }
+    else
+      bus_id2gpio_data_[bus].insert((std::make_pair(id, GpioData{ .value = {}, .mode = {} })));
   }
   catch (XmlRpc::XmlRpcException& e)
   {
