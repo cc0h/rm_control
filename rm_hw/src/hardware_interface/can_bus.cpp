@@ -112,19 +112,6 @@ void CanBus::write()
       socket_can_.write(&frame);
     }
   }
-  for (auto& item : *data_ptr_.id2gpio_data_)
-  {
-    can_frame frame{};
-    const GpioData& gpio_data = item.second;
-    frame.can_id = 0x300;
-    frame.can_dlc = 2;
-    for (int i = 0; i < 8; i++)
-    {
-      frame.data[0] |= (gpio_data.mode[i] << i);
-      frame.data[1] |= (gpio_data.value[i] << i);
-      socket_can_.write(&frame);
-    }
-  }
 
   if (has_write_frame0)
     socket_can_.write(&rm_frame0_);
