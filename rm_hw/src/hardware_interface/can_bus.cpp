@@ -39,6 +39,7 @@
 #include <string>
 #include <ros/ros.h>
 #include <rm_common/math_utilities.h>
+#include <rm_common/hardware_interface/gpio_interface.h>
 namespace rm_hw
 {
 CanBus::CanBus(const std::string& bus_name, CanDataPtr data_ptr, int thread_priority)
@@ -69,7 +70,7 @@ void CanBus::write()
     {
       if (item.second.halted)
       {
-        //        ROS_ERROR_STREAM(item.second.name << "LOSE CAN");
+        ROS_ERROR_STREAM(item.second.name << "LOSE CAN");
         continue;
       }
       const ActCoeff& act_coeff = data_ptr_.type2act_coeffs_->find(item.second.type)->second;
@@ -117,6 +118,23 @@ void CanBus::write()
     socket_can_.write(&rm_frame0_);
   if (has_write_frame1)
     socket_can_.write(&rm_frame1_);
+
+  for (auto& item : *data_ptr_.id2gpio_data_)
+  {
+    can_frame frame{};
+    frame.can_id = 0x300;
+    frame.can_dlc = 0;
+    std::fill(std::begin(frame.data), std::end(frame.data), 0);
+    for (int i = 0; i < 8; ++i)
+    {
+      if (*item.second.mode == rm_control::GpioType::INPUT)
+        frame.data[0] |= 0 << i;
+      else
+        frame.data[0] |= 1 << i;
+      frame.data[1] |= item.second.value[i] << i;
+    }
+    socket_can_.write(&frame);
+  }
 }
 
 void CanBus::read(ros::Time time)
@@ -266,12 +284,12 @@ void CanBus::read(ros::Time time)
         gpio_data.mode[a] = 1 & ((int16_t)(frame.data[0] >> a));
         gpio_data.value[a] = 1 & ((int16_t)(frame.data[1] >> a));
       }
-      ROS_INFO_STREAM("Gpio modes: " << gpio_data.mode[7] << gpio_data.mode[6] << gpio_data.mode[5] << gpio_data.mode[4]
-                                     << gpio_data.mode[3] << gpio_data.mode[2] << gpio_data.mode[1]
-                                     << gpio_data.mode[0]);
-      ROS_INFO_STREAM("Gpio values: " << gpio_data.value[7] << gpio_data.value[6] << gpio_data.value[5]
-                                      << gpio_data.value[4] << gpio_data.value[3] << gpio_data.value[2]
-                                      << gpio_data.value[1] << gpio_data.value[0]);
+      //      ROS_INFO_STREAM("Gpio  modes: " << gpio_data.mode[7] << gpio_data.mode[6] << gpio_data.mode[5] << gpio_data.mode[4]
+      //                                     << gpio_data.mode[3] << gpio_data.mode[2] << gpio_data.mode[1]
+      //                                     << gpio_data.mode[0]);
+      //      ROS_INFO_STREAM("Gpio values: " << gpio_data.value[7] << gpio_data.value[6] << gpio_data.value[5]
+      //                                      << gpio_data.value[4] << gpio_data.value[3] << gpio_data.value[2]
+      //                                      << gpio_data.value[1] << gpio_data.value[0]);
       continue;
     }
     if (frame.can_id != 0x0)

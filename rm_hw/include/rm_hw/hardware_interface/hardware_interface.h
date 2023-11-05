@@ -63,7 +63,6 @@
 #include <rm_msgs/EnableImuTrigger.h>
 
 #include "can_bus.h"
-#include "gpio_manager.h"
 
 namespace rm_hw
 {
@@ -182,7 +181,6 @@ private:
   int thread_priority_;
   // Interface
   std::vector<CanBus*> can_buses_{};
-  GpioManager gpio_manager_{};
   rm_control::GpioStateInterface gpio_state_interface_;
   rm_control::GpioCommandInterface gpio_command_interface_;
   hardware_interface::ActuatorStateInterface act_state_interface_;

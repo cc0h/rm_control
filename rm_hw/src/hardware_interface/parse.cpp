@@ -408,12 +408,10 @@ bool RmRobotHW::parseGpioData(XmlRpc::XmlRpcValue& gpio_datas, ros::NodeHandle& 
     if (!gpio_datas.hasMember("bus"))
     {
       ROS_ERROR_STREAM("Gpio2can has no associated bus.");
-      return false;
     }
     else if (!gpio_datas.hasMember("id"))
     {
       ROS_ERROR_STREAM("Gpio2can has no associated ID.");
-      return false;
     }
     std::string bus = gpio_datas["bus"];
     int id = static_cast<int>(gpio_datas["id"]);
@@ -423,6 +421,7 @@ bool RmRobotHW::parseGpioData(XmlRpc::XmlRpcValue& gpio_datas, ros::NodeHandle& 
       return false;
     }
     // for bus interface
+
     if (bus_id2gpio_data_.find(bus) == bus_id2gpio_data_.end())
     {
       bus_id2gpio_data_.insert(std::make_pair(bus, std::unordered_map<int, GpioData>()));
@@ -431,14 +430,14 @@ bool RmRobotHW::parseGpioData(XmlRpc::XmlRpcValue& gpio_datas, ros::NodeHandle& 
 
     if (!(bus_id2gpio_data_[bus].find(id) == bus_id2gpio_data_[bus].end()))
     {
-      ROS_ERROR_STREAM("Repeat Gpio on bus " << bus << " and ID " << id);
+      ROS_ERROR_STREAM("Repeat Gpio on bus " << bus << " and ID " << std::hex << id);
       return false;
     }
     else
     {
-      bus_id2gpio_data_[bus].insert(std::make_pair(id, GpioData{ .stamp = {}, .value = {}, .mode = {} }));
+      bus_id2gpio_data_[bus].insert(
+          std::make_pair(id, GpioData{ .stamp = {}, .bit = {}, .value = { 0 }, .mode = { 0 }, .cmd = { 0 } }));
     }
-
     auto it = gpio_datas.begin();
     std::advance(it, 1);
     for (; it != gpio_datas.end(); ++it)
@@ -451,7 +450,7 @@ bool RmRobotHW::parseGpioData(XmlRpc::XmlRpcValue& gpio_datas, ros::NodeHandle& 
         gpioData.bit = gpio_datas[it->first]["bit"];
         ROS_INFO_STREAM("gpio bit get is " << gpioData.bit);
         gpioData.value = &bus_id2gpio_data_[bus][id].value[static_cast<int>(gpio_datas[it->first]["bit"])];
-        ROS_INFO_STREAM("gpio value ptr is " << gpioData.value);
+        ROS_INFO_STREAM("gpio " << gpioData.name << " value is " << *gpioData.value);
         if (std::string(gpio_datas[it->first]["direction"]) == "in")
         {
           gpioData.type = rm_control::INPUT;
@@ -466,14 +465,15 @@ bool RmRobotHW::parseGpioData(XmlRpc::XmlRpcValue& gpio_datas, ros::NodeHandle& 
           continue;
         }
         rm_control::GpioStateHandle gpio_state_handle(
-            it->first, gpioData.type, &bus_id2gpio_data_[bus][id].value[static_cast<int>(gpio_datas[it->first]["bit"])]);
+            it->first, gpioData.type, &bus_id2gpio_data_[bus][id].value[static_cast<int>(gpio_datas[it->first]["bit"])],
+            gpioData.bit);
         ROS_INFO_STREAM("gpio state handle added");
         gpio_state_interface_.registerHandle(gpio_state_handle);
         if (gpioData.type == rm_control::OUTPUT)
         {
           rm_control::GpioCommandHandle gpio_command_handle(
-              it->first, gpioData.type,
-              &bus_id2gpio_data_[bus][id].value[static_cast<int>(gpio_datas[it->first]["bit"])]);
+              it->first, gpioData.type, &bus_id2gpio_data_[bus][id].cmd[static_cast<int>(gpio_datas[it->first]["bit"])],
+              gpioData.bit);
           gpio_command_interface_.registerHandle(gpio_command_handle);
         }
       }

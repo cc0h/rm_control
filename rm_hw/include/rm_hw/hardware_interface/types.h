@@ -87,7 +87,14 @@ struct ImuData
 struct GpioData
 {
   ros::Time stamp;
-  bool value[8], mode[8];
+  int bit[8];
+  bool value[8], mode[8], cmd[8], inited;
+};
+
+struct GpioCmd
+{
+  int bit;
+  bool value;
 };
 
 struct TofData
