@@ -62,8 +62,8 @@ class GpioCommandHandle
 {
 public:
   GpioCommandHandle() = default;
-  GpioCommandHandle(std::string name, GpioType type, bool* cmd, int bit)
-    : name_(std::move(name)), type_(type), cmd_(cmd), bit_(bit)
+  GpioCommandHandle(std::string name, GpioType type, bool* cmd, bool* changed)
+    : name_(std::move(name)), type_(type), cmd_(cmd), changed_(changed)
   {
     if (!cmd)
       throw hardware_interface::HardwareInterfaceException("Cannot create handle '" + name +
@@ -83,17 +83,14 @@ public:
   {
     assert(cmd_);
     *cmd_ = value;
-  }
-  int getBit() const
-  {
-    return bit_;
+    *changed_ = true;
   }
 
 private:
   std::string name_;
   GpioType type_;
   bool* cmd_ = { nullptr };
-  int bit_;
+  bool* changed_ = { nullptr };
 };
 
 class GpioStateInterface

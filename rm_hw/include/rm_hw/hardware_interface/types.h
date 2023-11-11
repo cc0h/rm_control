@@ -88,7 +88,7 @@ struct GpioData
 {
   ros::Time stamp;
   int bit[8];
-  bool value[8], mode[8], cmd[8], inited;
+  bool value[8], mode[8], cmd[8], changed;
 };
 
 struct GpioCmd
