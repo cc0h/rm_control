@@ -215,6 +215,7 @@ int Referee::unpack(uint8_t* rx_data)
           supply_projectile_action_data.supply_robot_id = supply_projectile_action_ref.supply_robot_id;
           supply_projectile_action_data.stamp = last_get_data_time_;
 
+          referee_ui_.supplyBulletDataCallBack(supply_projectile_action_data);
           supply_projectile_action_pub_.publish(supply_projectile_action_data);
           break;
         }
@@ -331,6 +332,7 @@ int Referee::unpack(uint8_t* rx_data)
           shoot_data.shooter_id = shoot_data_ref.shooter_id;
           shoot_data.stamp = last_get_data_time_;
 
+          referee_ui_.updateShootDataDataCallBack(shoot_data);
           shoot_data_pub_.publish(shoot_data);
           break;
         }
@@ -468,7 +470,6 @@ int Referee::unpack(uint8_t* rx_data)
 
           client_map_send_data.target_position_x = client_map_send_data_ref.target_position_x;
           client_map_send_data.target_position_y = client_map_send_data_ref.target_position_y;
-          client_map_send_data.target_position_z = client_map_send_data_ref.target_position_z;
           client_map_send_data.command_keyboard = client_map_send_data_ref.command_keyboard;
           client_map_send_data.target_robot_ID = client_map_send_data_ref.target_robot_ID;
           client_map_send_data.cmd_source = client_map_send_data_ref.cmd_source;
@@ -479,14 +480,16 @@ int Referee::unpack(uint8_t* rx_data)
         }
         case rm_referee::SENTRY_INFO_CMD:
         {
-          rm_referee::SentryInfo sentry_info;
-          memcpy(&sentry_info, rx_data + 7, sizeof(rm_referee::SentryInfo));
+          rm_msgs::SentryInfo sentry_info;
+          memcpy(&sentry_info, rx_data + 7, sizeof(rm_msgs::SentryInfo));
+          sentry_info_pub_.publish(sentry_info);
           break;
         }
         case rm_referee::RADAR_INFO_CMD:
         {
-          rm_referee::RadarInfo radar_info;
-          memcpy(&radar_info, rx_data + 7, sizeof(rm_referee::RadarInfo));
+          rm_msgs::RadarInfo radar_info;
+          memcpy(&radar_info, rx_data + 7, sizeof(rm_msgs::RadarInfo));
+          radar_info_pub_.publish(radar_info);
           break;
         }
         case rm_referee::POWER_MANAGEMENT_SAMPLE_AND_STATUS_DATA_CMD:

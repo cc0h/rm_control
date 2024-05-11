@@ -44,6 +44,7 @@
 #include <rm_msgs/ChassisCmd.h>
 #include <rm_msgs/GimbalCmd.h>
 #include <rm_msgs/ShootCmd.h>
+#include <rm_msgs/ShootBeforehandCmd.h>
 #include <rm_msgs/GimbalDesError.h>
 #include <rm_msgs/StateCmd.h>
 #include <rm_msgs/TrackData.h>
@@ -160,10 +161,15 @@ public:
       max_angular_z_.init(xml_rpc_value);
     std::string topic;
     nh.getParam("power_limit_topic", topic);
+    target_vel_yaw_threshold_ = getParam(nh, "target_vel_yaw_threshold", 4.);
     chassis_power_limit_subscriber_ =
         nh.subscribe<rm_msgs::ChassisCmd>(topic, 1, &Vel2DCommandSender::chassisCmdCallback, this);
   }
 
+  void updateTrackData(const rm_msgs::TrackData& data)
+  {
+    track_data_ = data;
+  }
   void setLinearXVel(double scale)
   {
     msg_.linear.x = scale * max_linear_x_.output(power_limit_);
@@ -174,7 +180,11 @@ public:
   };
   void setAngularZVel(double scale)
   {
-    msg_.angular.z = scale * max_angular_z_.output(power_limit_);
+    if (track_data_.v_yaw > target_vel_yaw_threshold_)
+      vel_direction_ = -1.;
+    if (track_data_.v_yaw < -target_vel_yaw_threshold_)
+      vel_direction_ = 1.;
+    msg_.angular.z = scale * max_angular_z_.output(power_limit_) * vel_direction_;
   };
   void set2DVel(double scale_x, double scale_y, double scale_z)
   {
@@ -196,8 +206,11 @@ protected:
   }
 
   LinearInterp max_linear_x_, max_linear_y_, max_angular_z_;
-  double power_limit_ = 0;
+  double power_limit_ = 0.;
+  double target_vel_yaw_threshold_{};
+  double vel_direction_ = 1.;
   ros::Subscriber chassis_power_limit_subscriber_;
+  rm_msgs::TrackData track_data_;
 };
 
 class ChassisCommandSender : public TimeStampCommandSenderBase<rm_msgs::ChassisCmd>
@@ -359,9 +372,9 @@ public:
   {
     gimbal_des_error_ = error;
   }
-  void updateAllowShoot(const rm_msgs::GimbalDesError& data)
+  void updateShootBeforehandCmd(const rm_msgs::ShootBeforehandCmd& data)
   {
-    allow_shoot_ = data;
+    shoot_beforehand_cmd_ = data;
   }
   void updateTrackData(const rm_msgs::TrackData& data)
   {
@@ -373,10 +386,19 @@ public:
   }
   void checkError(const ros::Time& time)
   {
-    if ((((gimbal_des_error_.error > gimbal_error_tolerance_ && time - gimbal_des_error_.stamp < ros::Duration(0.1)) ||
-          (track_data_.accel > target_acceleration_tolerance_)) ||
-         (!suggest_fire_.data && armor_type_ == rm_msgs::StatusChangeRequest::ARMOR_OUTPOST_BASE)) ||
-        (allow_shoot_.error == 0. && time - allow_shoot_.stamp < ros::Duration(0.1)))
+    if (msg_.mode == rm_msgs::ShootCmd::PUSH && time - shoot_beforehand_cmd_.stamp < ros::Duration(0.1))
+    {
+      if (shoot_beforehand_cmd_.cmd == rm_msgs::ShootBeforehandCmd::ALLOW_SHOOT)
+        return;
+      if (shoot_beforehand_cmd_.cmd == rm_msgs::ShootBeforehandCmd::BAN_SHOOT)
+      {
+        setMode(rm_msgs::ShootCmd::READY);
+        return;
+      }
+    }
+    if (((gimbal_des_error_.error > gimbal_error_tolerance_ && time - gimbal_des_error_.stamp < ros::Duration(0.1)) ||
+         (track_data_.accel > target_acceleration_tolerance_)) ||
+        (!suggest_fire_.data && armor_type_ == rm_msgs::StatusChangeRequest::ARMOR_OUTPOST_BASE))
       if (msg_.mode == rm_msgs::ShootCmd::PUSH)
         setMode(rm_msgs::ShootCmd::READY);
   }
@@ -464,7 +486,8 @@ private:
   double extra_wheel_speed_once_{};
   double total_extra_wheel_speed_{};
   rm_msgs::TrackData track_data_;
-  rm_msgs::GimbalDesError gimbal_des_error_, allow_shoot_;
+  rm_msgs::GimbalDesError gimbal_des_error_;
+  rm_msgs::ShootBeforehandCmd shoot_beforehand_cmd_;
   std_msgs::Bool suggest_fire_;
   uint8_t armor_type_{};
 };
