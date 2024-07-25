@@ -61,6 +61,7 @@ add_message_files(
         GameStatus.msg
         StateCmd.msg
         EngineerUi.msg
+        Engineer2Ui.msg
         GameRobotHp.msg
         PowerHeatData.msg
         EventData.msg
