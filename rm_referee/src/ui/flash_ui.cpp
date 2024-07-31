@@ -35,6 +35,66 @@ void FlashUi::updateFlashUiForQueue(const ros::Time& time, bool state, bool once
   UiBase::updateForQueue();
 }
 
+void FlashGroupUi::updateFlashUiForQueue(const ros::Time& time, bool state, bool once)
+{
+  if (once)
+  {
+    if (state)
+    {
+      for (auto graph : graph_vector_)
+        graph.second->setOperation(rm_referee::GraphOperation::ADD);
+      for (auto character : character_vector_)
+        character.second->setOperation(rm_referee::GraphOperation::ADD);
+    }
+    else
+    {
+      for (auto graph : graph_vector_)
+        graph.second->setOperation(rm_referee::GraphOperation::DELETE);
+      for (auto character : character_vector_)
+        character.second->setOperation(rm_referee::GraphOperation::DELETE);
+    }
+  }
+  else if (time - last_send_ > delay_)
+  {
+    ROS_INFO("%f  %.3f", last_send_.toSec(), delay_.toSec());
+    if (state)
+    {
+      for (auto graph : graph_vector_)
+        graph.second->setOperation(rm_referee::GraphOperation::ADD);
+      for (auto character : character_vector_)
+        character.second->setOperation(rm_referee::GraphOperation::ADD);
+    }
+    else
+    {
+      for (auto graph : graph_vector_)
+        graph.second->setOperation(rm_referee::GraphOperation::DELETE);
+      for (auto character : character_vector_)
+        character.second->setOperation(rm_referee::GraphOperation::DELETE);
+    }
+  }
+
+  bool is_repeat = true;
+  for (auto it : graph_vector_)
+    if (!it.second->isRepeated())
+      is_repeat = false;
+  for (auto it : character_vector_)
+    if (!it.second->isRepeated())
+      is_repeat = false;
+  if (is_repeat)
+    return;
+
+  for (auto it : graph_vector_)
+    it.second->updateLastConfig();
+  for (auto it : character_vector_)
+    it.second->updateLastConfig();
+
+  last_send_ = time;
+  for (auto it : character_vector_)
+    character_queue_->push_back(*it.second);
+  for (auto it : graph_vector_)
+    graph_queue_->push_back(*it.second);
+}
+
 void FlashGroupUi::updateFlashUiForQueue(const ros::Time& time, bool state, bool once, Graph* graph)
 {
   if (once)
@@ -62,14 +122,13 @@ void FlashGroupUi::updateFlashUiForQueue(const ros::Time& time, bool state, bool
     graph_queue_->push_back(*graph);
 }
 
-void EngineerActionFlashUi::updateEngineerUiCmdData(const rm_msgs::EngineerUi::ConstPtr data,
-                                                    const ros::Time& last_get_data_time)
+void CustomizeDisplayFlashUi::updateCmdData(const uint32_t& data)
 {
-  symbol_ = data->symbol;
-  display(last_get_data_time);
+  symbol_ = data;
+  display(ros::Time::now());
 }
 
-void EngineerActionFlashUi::display(const ros::Time& time)
+void CustomizeDisplayFlashUi::display(const ros::Time& time)
 {
   for (auto graph : graph_vector_)
   {
@@ -126,9 +185,9 @@ void HeroHitFlashUi::updateHittingConfig(const rm_msgs::GameRobotHp& msg)
 void HeroHitFlashUi::display(const ros::Time& time)
 {
   if (hitted_)
-    FlashUi::updateFlashUiForQueue(time, true, true);
+    FlashGroupUi::updateFlashUiForQueue(time, true, true);
   else
-    FlashUi::updateFlashUiForQueue(time, false, false);
+    FlashGroupUi::updateFlashUiForQueue(time, false, false);
 }
 
 void ExceedBulletSpeedFlashUi::display(const ros::Time& time)

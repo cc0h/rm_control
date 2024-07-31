@@ -33,18 +33,19 @@ public:
   }
   virtual void display(const ros::Time& time){};
   virtual void updateConfig(){};
+  void updateFlashUiForQueue(const ros::Time& time, bool state, bool once);
   void updateFlashUiForQueue(const ros::Time& time, bool state, bool once, Graph* graph);
 
 protected:
   std::string graph_name_;
 };
 
-class EngineerActionFlashUi : public FlashGroupUi
+class CustomizeDisplayFlashUi : public FlashGroupUi
 {
 public:
-  explicit EngineerActionFlashUi(XmlRpc::XmlRpcValue& rpc_value, Base& base, std::deque<Graph>* graph_queue,
-                                 std::deque<Graph>* character_queue)
-    : FlashGroupUi(rpc_value, base, "engineer_action", graph_queue, character_queue)
+  explicit CustomizeDisplayFlashUi(XmlRpc::XmlRpcValue& rpc_value, Base& base, std::deque<Graph>* graph_queue,
+                                   std::deque<Graph>* character_queue)
+    : FlashGroupUi(rpc_value, base, "customize_display", graph_queue, character_queue)
   {
     if (rpc_value.hasMember("data"))
     {
@@ -56,7 +57,7 @@ public:
       }
     }
   }
-  void updateEngineerUiCmdData(const rm_msgs::EngineerUi::ConstPtr data, const ros::Time& last_get_data_time);
+  void updateCmdData(const uint32_t& data);
 
 private:
   void display(const ros::Time& time) override;
@@ -90,13 +91,32 @@ private:
   uint8_t chassis_mode_;
 };
 
-class HeroHitFlashUi : public FlashUi
+class HeroHitFlashUi : public FlashGroupUi
 {
 public:
   explicit HeroHitFlashUi(XmlRpc::XmlRpcValue& rpc_value, Base& base, std::deque<Graph>* graph_queue,
                           std::deque<Graph>* character_queue)
-    : FlashUi(rpc_value, base, " hero_hit", graph_queue, character_queue)
+    : FlashGroupUi(rpc_value, base, " hero_hit", graph_queue, character_queue)
   {
+    graph_vector_.insert(std::pair<std::string, Graph*>("1", new Graph(rpc_value["config"], base_, id_++)));
+    graph_vector_.insert(std::pair<std::string, Graph*>("2", new Graph(rpc_value["config"], base_, id_++)));
+    for (auto it : graph_vector_)
+    {
+      if (it.first == "1")
+      {
+        it.second->setStartX(960 + 50);
+        it.second->setStartY(540 + 50);
+        it.second->setEndX(960 - 50);
+        it.second->setEndY(540 - 50);
+      }
+      else if (it.first == "2")
+      {
+        it.second->setStartX(960 - 50);
+        it.second->setStartY(540 + 50);
+        it.second->setEndX(960 + 50);
+        it.second->setEndY(540 - 50);
+      }
+    }
   }
   void updateHittingConfig(const rm_msgs::GameRobotHp& msg);
 

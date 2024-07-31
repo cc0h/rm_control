@@ -37,11 +37,11 @@ RefereeBase::RefereeBase(ros::NodeHandle& nh, Base& base) : base_(base), nh_(nh)
   RefereeBase::radar_receive_sub_ =
       nh.subscribe<rm_msgs::ClientMapReceiveData>("/rm_radar", 10, &RefereeBase::radarReceiveCallback, this);
   RefereeBase::sentry_cmd_sub_ =
-      nh.subscribe<rm_msgs::SentryInfo>("/sentry_cmd", 1, &RefereeBase::sendSentryCmdCallback, this);
+      nh.subscribe<rm_msgs::SentryCmd>("/sentry_cmd", 1, &RefereeBase::sendSentryCmdCallback, this);
   RefereeBase::radar_cmd_sub_ =
       nh.subscribe<rm_msgs::RadarInfo>("/radar_cmd", 1, &RefereeBase::sendRadarCmdCallback, this);
   RefereeBase::sentry_state_sub_ =
-      nh.subscribe<std_msgs::String>("/sentry_state", 1, &RefereeBase::sendSentryStateCallback, this);
+      nh.subscribe<std_msgs::String>("/custom_info", 1, &RefereeBase::sendCustomInfoCallback, this);
   RefereeBase::drone_pose_sub_ =
       nh.subscribe<geometry_msgs::PoseStamped>("/mavros/vision_pose/pose", 1, &RefereeBase::dronePoseCallBack, this);
   RefereeBase::shoot_cmd_sub_ = nh.subscribe<rm_msgs::ShootCmd>("/controllers/shooter_controller/command", 1,
@@ -50,6 +50,10 @@ RefereeBase::RefereeBase(ros::NodeHandle& nh, Base& base) : base_(base), nh_(nh)
       "/sentry_target_to_referee", 1, &RefereeBase::sentryAttackingTargetCallback, this);
   RefereeBase::radar_to_referee_sub_ =
       nh.subscribe<rm_msgs::RadarToSentry>("/radar_to_referee", 1, &RefereeBase::radarToRefereeCallBack, this);
+  RefereeBase::customize_display_cmd_sub_ =
+      nh.subscribe<std_msgs::UInt32>("/customize_display_ui", 1, &RefereeBase::customizeDisplayCmdCallBack, this);
+  RefereeBase::visualize_state_data_sub_ =
+      nh.subscribe<rm_msgs::VisualizeStateData>("/visualize_state", 1, &RefereeBase::visualizeStateDataCallBack, this);
 
   XmlRpc::XmlRpcValue rpc_value;
   send_ui_queue_delay_ = getParam(nh, "send_ui_queue_delay", 0.15);
@@ -88,6 +92,9 @@ RefereeBase::RefereeBase(ros::NodeHandle& nh, Base& base) : base_(base), nh_(nh)
       if (rpc_value[i]["name"] == "stone")
         stone_num_trigger_change_ui_ =
             new StringTriggerChangeUi(rpc_value[i], base_, "stone_num", &graph_queue_, &character_queue_);
+      if (rpc_value[i]["name"] == "visualize_state")
+        visualize_state_trigger_change_ui_ =
+            new VisualizeStateTriggerChangeUi(rpc_value[i], base_, "visualize_state", &graph_queue_, &character_queue_);
     }
 
     ui_nh.getParam("time_change", rpc_value);
@@ -148,8 +155,9 @@ RefereeBase::RefereeBase(ros::NodeHandle& nh, Base& base) : base_(base), nh_(nh)
       if (rpc_value[i]["name"] == "exceed_bullet_speed")
         exceed_bullet_speed_flash_ui_ =
             new ExceedBulletSpeedFlashUi(rpc_value[i], base_, &graph_queue_, &character_queue_);
-      if (rpc_value[i]["name"] == "engineer_action")
-        engineer_action_flash_ui_ = new EngineerActionFlashUi(rpc_value[i], base_, &graph_queue_, &character_queue_);
+      if (rpc_value[i]["name"] == "customize_display")
+        customize_display_flash_ui_ =
+            new CustomizeDisplayFlashUi(rpc_value[i], base_, &graph_queue_, &character_queue_);
     }
   }
   if (nh.hasParam("interactive_data"))
@@ -157,10 +165,8 @@ RefereeBase::RefereeBase(ros::NodeHandle& nh, Base& base) : base_(base), nh_(nh)
     nh.getParam("interactive_data", rpc_value);
     for (int i = 0; i < rpc_value.size(); i++)
     {
-      //      if (rpc_value[i]["name"] == "enemy_hero_state")
-      //        enemy_hero_state_sender_ = new CustomInfoSender(rpc_value[i], base_);
-      if (rpc_value[i]["name"] == "sentry_state")
-        sentry_state_sender_ = new CustomInfoSender(rpc_value[i], base_);
+      if (rpc_value[i]["name"] == "custom_info")
+        custom_info_sender = new CustomInfoSender(rpc_value[i], base_);
       if (rpc_value[i]["name"] == "bullet_num_share")
         bullet_num_share_ = new BulletNumShare(rpc_value[i], base_);
       if (rpc_value[i]["name"] == "sentry_to_radar")
@@ -247,6 +253,8 @@ void RefereeBase::addUi()
     target_distance_time_change_ui_->addForQueue();
   if (friend_bullets_time_change_group_ui_)
     friend_bullets_time_change_group_ui_->addForQueue();
+  if (visualize_state_trigger_change_ui_)
+    visualize_state_trigger_change_ui_->addForQueue();
   add_ui_times_++;
 }
 
@@ -340,29 +348,6 @@ void RefereeBase::robotStatusDataCallBack(const rm_msgs::GameRobotStatus& data, 
 {
   if (fixed_ui_ && !is_adding_)
     fixed_ui_->updateForQueue();
-}
-void RefereeBase::updateEnemyHeroState(const rm_msgs::GameRobotHp& game_robot_hp_data,
-                                       const ros::Time& last_get_data_time)
-{
-  //  if (enemy_hero_state_sender_)
-  //  {
-  //    std::wstring data;
-  //    if (base_.robot_id_ < 100)
-  //    {
-  //      if (game_robot_hp_data.blue_1_robot_hp > 0)
-  //        data = L"敌方英雄存活:" + std::to_wstring(game_robot_hp_data.blue_1_robot_hp);
-  //      else
-  //        data = L"敌方英雄死亡";
-  //    }
-  //    else if (base_.robot_id_ >= 100)
-  //    {
-  //      if (game_robot_hp_data.red_1_robot_hp > 0)
-  //        data = L"敌方英雄存活:" + std::to_wstring(game_robot_hp_data.red_1_robot_hp);
-  //      else
-  //        data = L"敌方英雄死亡";
-  //    }
-  //    enemy_hero_state_sender_->sendCustomInfoData(data);
-  //  }
 }
 
 void RefereeBase::updateHeroHitDataCallBack(const rm_msgs::GameRobotHp& game_robot_hp_data)
@@ -470,18 +455,14 @@ void RefereeBase::cardCmdDataCallback(const rm_msgs::StateCmd::ConstPtr& data)
 }
 void RefereeBase::engineerUiDataCallback(const rm_msgs::EngineerUi::ConstPtr& data)
 {
-  /*if (progress_time_change_ui_ && !is_adding_)
-    progress_time_change_ui_->updateEngineerUiData(data, ros::Time::now());*/
-  /*  if (drag_state_trigger_change_ui_ && !is_adding_)
-      drag_state_trigger_change_ui_->updateStringUiData(data->drag_state);*/
   if (gripper_state_trigger_change_ui_ && !is_adding_)
     gripper_state_trigger_change_ui_->updateStringUiData(data->gripper_state);
   if (stone_num_trigger_change_ui_ && !is_adding_)
     stone_num_trigger_change_ui_->updateStringUiData(std::to_string(data->stone_num));
   if (servo_mode_trigger_change_ui_ && !is_adding_)
     servo_mode_trigger_change_ui_->updateStringUiData(data->control_mode);
-  if (engineer_action_flash_ui_ && !is_adding_)
-    engineer_action_flash_ui_->updateEngineerUiCmdData(data, ros::Time::now());
+  if (customize_display_flash_ui_ && !is_adding_)
+    customize_display_flash_ui_->updateCmdData(data->symbol);
 }
 void RefereeBase::manualDataCallBack(const rm_msgs::ManualToReferee::ConstPtr& data)
 {
@@ -550,7 +531,7 @@ void RefereeBase::mapSentryCallback(const rm_msgs::MapSentryDataConstPtr& data)
     sentry_interactive_data_last_send_ = ros::Time::now();
   }
 }
-void RefereeBase::sendSentryCmdCallback(const rm_msgs::SentryInfoConstPtr& data)
+void RefereeBase::sendSentryCmdCallback(const rm_msgs::SentryCmdConstPtr& data)
 {
   if (ros::Time::now() - sentry_cmd_data_last_send_ <= ros::Duration(0.15))
     return;
@@ -571,11 +552,11 @@ void RefereeBase::sendRadarCmdCallback(const rm_msgs::RadarInfoConstPtr& data)
   }
 }
 
-void RefereeBase::sendSentryStateCallback(const std_msgs::StringConstPtr& data)
+void RefereeBase::sendCustomInfoCallback(const std_msgs::StringConstPtr& data)
 {
   std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-  if (sentry_state_sender_)
-    sentry_state_sender_->sendCustomInfoData(converter.from_bytes(data->data));
+  if (custom_info_sender)
+    custom_info_sender->sendCustomInfoData(converter.from_bytes(data->data));
 }
 
 void RefereeBase::supplyBulletDataCallBack(const rm_msgs::SupplyProjectileAction& data)
@@ -610,6 +591,23 @@ void RefereeBase::radarToRefereeCallBack(const rm_msgs::RadarToSentryConstPtr& d
 {
   if (radar_to_sentry_)
     radar_to_sentry_->updateRadarToSentryData(data);
+}
+
+void RefereeBase::customizeDisplayCmdCallBack(const std_msgs::UInt32ConstPtr& data)
+{
+  if (customize_display_flash_ui_ && !is_adding_)
+    customize_display_flash_ui_->updateCmdData(data->data);
+}
+
+void RefereeBase::visualizeStateDataCallBack(const rm_msgs::VisualizeStateDataConstPtr& data)
+{
+  if (visualize_state_trigger_change_ui_ && !is_adding_)
+  {
+    std::vector<bool> state;
+    for (auto state_data : data->state)
+      state.push_back(state_data);
+    visualize_state_trigger_change_ui_->updateUiColor(state);
+  }
 }
 
 }  // namespace rm_referee
