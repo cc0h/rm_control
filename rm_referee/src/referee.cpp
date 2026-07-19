@@ -50,7 +50,7 @@ void Referee::read()
     return;
   uint8_t temp_buffer[256] = { 0 };
   int frame_len;
-  if (ros::Time::now() - last_get_data_time_ > ros::Duration(0.1))
+  if (ros::Time::now() - last_get_data_time_ > ros::Duration(5.0))
     base_.referee_data_is_online_ = false;
   if (rx_len_ < k_unpack_buffer_length_)
   {
